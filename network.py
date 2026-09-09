@@ -65,8 +65,12 @@ def send_state(
             "hazard": "POLLUTION",
             "risk": round(float(pollution_risk), 1)
         }
+<<<<<<< HEAD
     print("NETWORK MESSAGE BEING SENT:")
     print(message)
+=======
+
+>>>>>>> ef016ddaba4368f7e0fc5826ff189afe482490d3
     data = json.dumps(message).encode("utf-8")
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
