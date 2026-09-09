@@ -270,15 +270,7 @@ send_state(
 )
 
 
-# Critical hazard alerts
-if flood_percent >= 70:
-    send_alert(NODE_ID, "FLOOD", flood_percent)
 
-if fire_percent >= 70:
-    send_alert(NODE_ID, "FIRE", fire_percent)
-
-if pollution_percent >= 70:
-    send_alert(NODE_ID, "POLLUTION", pollution_percent)
 
 # ============================================================================
 # HAZARD THREAT ASSESSMENT
@@ -692,6 +684,7 @@ other_nodes = {
 if other_nodes:
 
     for node_id, state in other_nodes.items():
+        st.write("RAW RECEIVED DATA:", state)
 
         flood_risk = state.get("flood_risk", 0)
         fire_risk = state.get("fire_risk", 0)
