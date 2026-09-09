@@ -3,7 +3,7 @@ import joblib
 import numpy as np
 import socket
 
-from network import send_alert, start_listener, get_alerts
+from network import send_alert, send_state, start_listener, get_node_states
 # Load models
 flood_model = joblib.load("models/flood_model.pkl")
 fire_model = joblib.load("models/fire_model.pkl")
@@ -15,7 +15,17 @@ def initialize_network():
 
 
 initialize_network()
-
+# Auto-refresh dashboard every 1 second
+st.markdown(
+    """
+    <script>
+        setTimeout(function(){
+            window.location.reload();
+        }, 1000);
+    </script>
+    """,
+    unsafe_allow_html=True
+)
 # Page configuration
 st.set_page_config(
     page_title="Environmental Intelligence Network",
@@ -226,17 +236,49 @@ pollution_percent = pollution_probability * 100
 pollution_category, pollution_color, pollution_border = get_pollution_category(pollution_percent)
 
 # ============================================================
-# NETWORK ALERT BROADCAST
+# LIVE NETWORK STATE BROADCAST
 # ============================================================
 
-def broadcast_if_critical(hazard, risk):
-    if risk >= 70:
-        send_alert(NODE_ID, hazard, risk)
+send_state(
+    node_id=NODE_ID,
+
+    flood_risk=flood_percent,
+    fire_risk=fire_percent,
+    pollution_risk=pollution_percent,
+
+    flood_sensors={
+        "water_level": round(float(water_level), 1),
+        "rainfall": round(float(rainfall), 1),
+        "soil_moisture": round(float(soil_moisture), 1),
+        "water_rise_rate": round(float(water_rise_rate), 1)
+    },
+
+    fire_sensors={
+        "temperature": round(float(temperature), 1),
+        "humidity": round(float(humidity), 1),
+        "smoke": round(float(smoke), 1),
+        "co": round(float(co), 1)
+    },
+
+    pollution_sensors={
+        "pm25": round(float(pm25), 1),
+        "pm10": round(float(pm10), 1),
+        "co": round(float(co), 1),
+        "temperature": round(float(temperature), 1),
+        "humidity": round(float(humidity), 1)
+    }
+)
 
 
-broadcast_if_critical("FLOOD", flood_percent)
-broadcast_if_critical("FIRE", fire_percent)
-broadcast_if_critical("POLLUTION", pollution_percent)
+# Critical hazard alerts
+if flood_percent >= 70:
+    send_alert(NODE_ID, "FLOOD", flood_percent)
+
+if fire_percent >= 70:
+    send_alert(NODE_ID, "FIRE", fire_percent)
+
+if pollution_percent >= 70:
+    send_alert(NODE_ID, "POLLUTION", pollution_percent)
 
 # ============================================================================
 # HAZARD THREAT ASSESSMENT
@@ -634,21 +676,91 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-network_alerts = get_alerts()
+# ============================================================
+# LIVE NETWORK INTELLIGENCE
+# ============================================================
 
-if network_alerts:
+node_states = get_node_states()
 
-    for alert in network_alerts:
+# Remove this laptop from the network display
+other_nodes = {
+    node_id: state
+    for node_id, state in node_states.items()
+    if node_id != NODE_ID
+}
 
-        st.warning(
-            f"🚨 {alert['node_id']} reports "
-            f"{alert['hazard']} RISK: "
-            f"{alert['risk']}%"
+if other_nodes:
+
+    for node_id, state in other_nodes.items():
+
+        flood_risk = state.get("flood_risk", 0)
+        fire_risk = state.get("fire_risk", 0)
+        pollution_risk = state.get("pollution_risk", 0)
+
+        last_alert = state.get("last_alert")
+
+        st.markdown(
+            f"""
+            <div style="
+                margin: 10px 0;
+                padding: 18px;
+                border-radius: 10px;
+                background: rgba(255,255,255,0.03);
+                border: 1px solid rgba(255,255,255,0.10);
+            ">
+
+                <div style="
+                    font-size: 18px;
+                    font-weight: bold;
+                    margin-bottom: 12px;
+                ">
+                    🖥️ {node_id}
+                </div>
+
+                <div style="
+                    display: flex;
+                    gap: 30px;
+                    font-size: 14px;
+                ">
+
+                    <div>
+                        🌊 FLOOD<br>
+                        <b>{flood_risk:.1f}%</b>
+                    </div>
+
+                    <div>
+                        🔥 FIRE<br>
+                        <b>{fire_risk:.1f}%</b>
+                    </div>
+
+                    <div>
+                        🌫️ POLLUTION<br>
+                        <b>{pollution_risk:.1f}%</b>
+                    </div>
+
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
         )
+
+        # Critical alert
+        if last_alert:
+
+            alert_hazard = last_alert.get("hazard", "UNKNOWN")
+            alert_risk = last_alert.get("risk", 0)
+
+            st.error(
+                f"🚨 {node_id} — "
+                f"{alert_hazard} RISK: {alert_risk}%"
+            )
 
 else:
 
-    st.info("🟢 No alerts received from other nodes.")
+    st.info(
+        "🟢 No other environmental nodes detected yet."
+    )
 
 # ============================================================================
 # SYSTEM STATUS
@@ -677,11 +789,11 @@ st.markdown("""
 status_cols = st.columns(5)
 
 status_cards = [
-    ("NODE ID", "NODE 01", "🖥️"),
+    ("NODE ID", NODE_ID, "🖥️"),
     ("AI MODELS", "3 LOADED", "🤖"),
     ("SENSOR SIM", "● ACTIVE", "📡"),
     ("LOCAL INFERENCE", "● ACTIVE", "⚡"),
-    ("NETWORK", "STANDBY", "🌐"),
+    ("NETWORK", "● LIVE", "🌐")
 ]
 
 for col_idx, (label, value, icon) in enumerate(status_cards):
