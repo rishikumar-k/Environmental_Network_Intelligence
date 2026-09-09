@@ -1,3 +1,4 @@
+from email.mime import message
 import socket
 import json
 import threading
@@ -40,9 +41,32 @@ def send_state(
 
         "flood_sensors": flood_sensors or {},
         "fire_sensors": fire_sensors or {},
-        "pollution_sensors": pollution_sensors or {}
+        "pollution_sensors": pollution_sensors or {},
+
+        # Add alert information directly to NODE_STATE
+        "alert": None
     }
 
+    # Determine highest critical hazard
+    if flood_risk >= 70:
+        message["alert"] = {
+            "hazard": "FLOOD",
+            "risk": round(float(flood_risk), 1)
+        }
+
+    elif fire_risk >= 70:
+        message["alert"] = {
+            "hazard": "FIRE",
+            "risk": round(float(fire_risk), 1)
+        }
+
+    elif pollution_risk >= 70:
+        message["alert"] = {
+            "hazard": "POLLUTION",
+            "risk": round(float(pollution_risk), 1)
+        }
+    print("NETWORK MESSAGE BEING SENT:")
+    print(message)
     data = json.dumps(message).encode("utf-8")
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -54,7 +78,6 @@ def send_state(
         print("Network send error:", e)
     finally:
         sock.close()
-
 
 def send_alert(node_id, hazard, risk):
     """
@@ -83,9 +106,6 @@ def send_alert(node_id, hazard, risk):
 
 
 def _listen():
-    """
-    Continuously listen for messages from other environmental nodes.
-    """
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -109,31 +129,16 @@ def _listen():
             if not node_id:
                 continue
 
-            # Store the latest state
-            with state_lock:
+            if message.get("type") == "NODE_STATE":
 
-                if message.get("type") == "NODE_STATE":
-
+                with state_lock:
                     node_states[node_id] = message
-
-                elif message.get("type") == "ALERT":
-
-                    # Preserve alert information
-                    if node_id not in node_states:
-                        node_states[node_id] = {
-                            "node_id": node_id
-                        }
-
-                    node_states[node_id]["last_alert"] = message
-
-                    node_states[node_id]["last_alert_time"] = time.time()
 
         except json.JSONDecodeError:
             print("Received invalid network message.")
 
         except Exception as e:
             print("Network listener error:", e)
-
 
 def start_listener():
     """

@@ -238,7 +238,13 @@ pollution_category, pollution_color, pollution_border = get_pollution_category(p
 # ============================================================
 # LIVE NETWORK STATE BROADCAST
 # ============================================================
-
+print("SENDING:")
+print("NODE:", NODE_ID)
+print("RAIN:", rainfall)
+print("WATER:", water_level)
+print("SOIL:", soil_moisture)
+print("RISE:", water_rise_rate)
+print("FLOOD:", flood_percent)
 send_state(
     node_id=NODE_ID,
 
@@ -270,15 +276,6 @@ send_state(
 )
 
 
-# Critical hazard alerts
-if flood_percent >= 70:
-    send_alert(NODE_ID, "FLOOD", flood_percent)
-
-if fire_percent >= 70:
-    send_alert(NODE_ID, "FIRE", fire_percent)
-
-if pollution_percent >= 70:
-    send_alert(NODE_ID, "POLLUTION", pollution_percent)
 
 # ============================================================================
 # HAZARD THREAT ASSESSMENT
