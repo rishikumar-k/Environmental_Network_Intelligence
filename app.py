@@ -1,11 +1,20 @@
 import streamlit as st
 import joblib
 import numpy as np
+import socket
 
+from network import send_alert, start_listener, get_alerts
 # Load models
 flood_model = joblib.load("models/flood_model.pkl")
 fire_model = joblib.load("models/fire_model.pkl")
 pollution_model = joblib.load("models/pollution_model.pkl")
+@st.cache_resource
+def initialize_network():
+    start_listener()
+    return True
+
+
+initialize_network()
 
 # Page configuration
 st.set_page_config(
@@ -14,6 +23,12 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# ============================================================
+# NODE CONFIGURATION
+# ============================================================
+
+NODE_ID = socket.gethostname()
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -209,6 +224,19 @@ pollution_input = np.array([[pm25, pm10, co, temperature, humidity]])
 pollution_probability = pollution_model.predict_proba(pollution_input)[0][1]
 pollution_percent = pollution_probability * 100
 pollution_category, pollution_color, pollution_border = get_pollution_category(pollution_percent)
+
+# ============================================================
+# NETWORK ALERT BROADCAST
+# ============================================================
+
+def broadcast_if_critical(hazard, risk):
+    if risk >= 70:
+        send_alert(NODE_ID, hazard, risk)
+
+
+broadcast_if_critical("FLOOD", flood_percent)
+broadcast_if_critical("FIRE", fire_percent)
+broadcast_if_critical("POLLUTION", pollution_percent)
 
 # ============================================================================
 # HAZARD THREAT ASSESSMENT
@@ -582,6 +610,45 @@ else:
     </div>
     """
     st.markdown(safe_html, unsafe_allow_html=True)
+
+# ============================================================
+# NETWORK ALERTS
+# ============================================================
+
+st.markdown("""
+<div style="
+    margin: 32px 0 16px 0;
+    padding: 12px 16px;
+    background: rgba(0, 150, 255, 0.08);
+    border-left: 4px solid #0099ff;
+    border-radius: 4px;
+">
+    <div style="
+        font-size: 13px;
+        color: #0099ff;
+        font-weight: bold;
+        letter-spacing: 1px;
+    ">
+        📡 NETWORK INTELLIGENCE
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+network_alerts = get_alerts()
+
+if network_alerts:
+
+    for alert in network_alerts:
+
+        st.warning(
+            f"🚨 {alert['node_id']} reports "
+            f"{alert['hazard']} RISK: "
+            f"{alert['risk']}%"
+        )
+
+else:
+
+    st.info("🟢 No alerts received from other nodes.")
 
 # ============================================================================
 # SYSTEM STATUS
